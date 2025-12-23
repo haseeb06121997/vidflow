@@ -11,6 +11,7 @@ import {
   Send,
   ArrowLeft,
 } from "lucide-react";
+
 import { Layout } from "@/components/layout/Layout";
 import { VideoPlayer } from "@/components/video/VideoPlayer";
 import { Button } from "@/components/ui/button";
@@ -24,9 +25,11 @@ import { toast } from "sonner";
 export default function WatchPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+
   const [video, setVideo] = useState<Video | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [newComment, setNewComment] = useState("");
   const [userRating, setUserRating] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
@@ -40,8 +43,35 @@ export default function WatchPage() {
 
   const loadVideo = async (videoId: string) => {
     try {
-      const data = await api.getVideo(videoId);
-      setVideo(data);
+      const data: any = await api.getVideo(videoId);
+
+      // 🔒 Prevent crashes with missing fields
+      const safeVideo = {
+        ...data,
+        videoId: data.videoId ?? videoId,
+        videoUrl: data.videoUrl ?? "",
+        thumbnailUrl:
+          data.thumbnailUrl ||
+          "https://via.placeholder.com/600x900?text=Video",
+        title: data.title ?? "Untitled Video",
+        caption: data.caption ?? "",
+        creatorName: data.creatorName ?? "Unknown Creator",
+        creatorAvatar:
+          data.creatorAvatar ??
+          "https://via.placeholder.com/100?text=User",
+        views: data.views ?? 0,
+        likes: data.likes ?? 0,
+        rating: data.rating ?? 4.5,
+        createdAt: data.createdAt ?? new Date().toISOString(),
+        location: data.location ?? "",
+        people: Array.isArray(data.people)
+          ? data.people
+          : data.people
+          ? [data.people]
+          : [],
+      };
+
+      setVideo(safeVideo);
     } catch (error) {
       console.error("Failed to load video:", error);
       toast.error("Failed to load video");
@@ -69,7 +99,7 @@ export default function WatchPage() {
       setComments([comment, ...comments]);
       setNewComment("");
       toast.success("Comment posted!");
-    } catch (error) {
+    } catch {
       toast.error("Failed to post comment");
     }
   };
@@ -77,10 +107,11 @@ export default function WatchPage() {
   const handleRate = async (rating: number) => {
     if (!id) return;
     setUserRating(rating);
+
     try {
       await api.rateVideo(id, rating);
-      toast.success(`Rated ${rating} stars!`);
-    } catch (error) {
+      toast.success(`Rated ${rating} ⭐`);
+    } catch {
       toast.error("Failed to rate video");
     }
   };
@@ -131,22 +162,28 @@ export default function WatchPage() {
         </Button>
 
         <div className="grid lg:grid-cols-[1fr,400px] gap-8">
-          {/* Video Section */}
+          {/* ==== VIDEO SECTION ==== */}
           <div className="space-y-6">
             <div className="max-w-lg mx-auto lg:max-w-none">
-              <VideoPlayer src={video.videoUrl} poster={video.thumbnailUrl} autoPlay />
+              <VideoPlayer
+                src={video.videoUrl}
+                poster={video.thumbnailUrl}
+                autoPlay
+              />
             </div>
 
-            {/* Video Info */}
+            {/* ==== INFO ==== */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
               className="space-y-4"
             >
-              <h1 className="text-2xl md:text-3xl font-bold">{video.title}</h1>
+              <h1 className="text-2xl md:text-3xl font-bold">
+                {video.title}
+              </h1>
 
-              {/* Creator Info */}
+              {/* Creator */}
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div className="flex items-center gap-3">
                   <img
@@ -157,7 +194,8 @@ export default function WatchPage() {
                   <div>
                     <p className="font-semibold">{video.creatorName}</p>
                     <p className="text-sm text-muted-foreground">
-                      {formatNumber(video.views)} views • {formatTimeAgo(video.createdAt)}
+                      {formatNumber(video.views)} views •{" "}
+                      {formatTimeAgo(video.createdAt)}
                     </p>
                   </div>
                 </div>
@@ -170,10 +208,20 @@ export default function WatchPage() {
                     onClick={handleLike}
                     className="gap-2"
                   >
-                    <Heart className={`w-4 h-4 ${isLiked ? "fill-current" : ""}`} />
+                    <Heart
+                      className={`w-4 h-4 ${
+                        isLiked ? "fill-current" : ""
+                      }`}
+                    />
                     {formatNumber(video.likes + (isLiked ? 1 : 0))}
                   </Button>
-                  <Button variant="secondary" size="sm" onClick={handleShare} className="gap-2">
+
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleShare}
+                    className="gap-2"
+                  >
                     <Share2 className="w-4 h-4" />
                     Share
                   </Button>
@@ -182,7 +230,7 @@ export default function WatchPage() {
 
               {/* Caption */}
               <Card className="p-4">
-                <p className="text-foreground">{video.caption}</p>
+                <p>{video.caption}</p>
 
                 <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-muted-foreground">
                   {video.location && (
@@ -191,6 +239,7 @@ export default function WatchPage() {
                       {video.location}
                     </span>
                   )}
+
                   {video.people && video.people.length > 0 && (
                     <span className="flex items-center gap-1">
                       <Users className="w-4 h-4" />
@@ -223,18 +272,21 @@ export default function WatchPage() {
                       ))}
                     </div>
                   </div>
+
                   <div className="text-right">
                     <p className="text-2xl font-bold gradient-text">
-                      {video.rating.toFixed(1)}
+                      {video.rating?.toFixed(1) ?? "4.5"}
                     </p>
-                    <p className="text-sm text-muted-foreground">Average rating</p>
+                    <p className="text-sm text-muted-foreground">
+                      Average rating
+                    </p>
                   </div>
                 </div>
               </Card>
             </motion.div>
           </div>
 
-          {/* Comments Section */}
+          {/* ==== COMMENTS ==== */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -248,7 +300,6 @@ export default function WatchPage() {
               </h2>
             </div>
 
-            {/* Comment Form */}
             <form onSubmit={handleSubmitComment} className="flex gap-2">
               <Input
                 placeholder="Add a comment..."
@@ -261,7 +312,6 @@ export default function WatchPage() {
               </Button>
             </form>
 
-            {/* Comments List */}
             <div className="space-y-3 max-h-[60vh] overflow-y-auto hide-scrollbar">
               {comments.map((comment, index) => (
                 <motion.div
@@ -286,9 +336,7 @@ export default function WatchPage() {
                             {formatTimeAgo(comment.createdAt)}
                           </span>
                         </div>
-                        <p className="text-sm text-foreground">
-                          {comment.content}
-                        </p>
+                        <p className="text-sm">{comment.content}</p>
                       </div>
                     </div>
                   </Card>
