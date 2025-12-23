@@ -1,6 +1,6 @@
 import { Video, User } from "@/types";
 
-// ⚠️ IMPORTANT — your API base URL
+// IMPORTANT —  API base URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // Temporary mock user until Cognito/Auth is added
