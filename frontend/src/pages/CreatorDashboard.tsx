@@ -27,12 +27,12 @@ import { toast } from "sonner";
 export default function CreatorDashboard() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
+
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  // Upload form state
   const [uploadForm, setUploadForm] = useState({
     title: "",
     caption: "",
@@ -63,43 +63,59 @@ export default function CreatorDashboard() {
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!uploadForm.title || !uploadForm.caption) {
       toast.error("Please fill in title and caption");
       return;
     }
 
-    setUploading(true);
+    if (!uploadForm.file) {
+      toast.error("Please select a video file");
+      return;
+    }
+
     try {
+      setUploading(true);
+
       const formData = new FormData();
       formData.append("title", uploadForm.title);
       formData.append("caption", uploadForm.caption);
-      formData.append("location", uploadForm.location);
-      formData.append("people", uploadForm.people);
-      if (uploadForm.file) {
-        formData.append("video", uploadForm.file);
-      }
+      formData.append("location", uploadForm.location || "");
+      formData.append("people", uploadForm.people || "");
+      formData.append("file", uploadForm.file); // IMPORTANT
 
       await api.uploadVideo(formData);
+
       toast.success("Video uploaded successfully!");
+
       setShowUploadModal(false);
-      setUploadForm({ title: "", caption: "", location: "", people: "", file: null });
+      setUploadForm({
+        title: "",
+        caption: "",
+        location: "",
+        people: "",
+        file: null,
+      });
+
       loadVideos();
     } catch (error) {
+      console.error(error);
       toast.error("Failed to upload video");
     } finally {
       setUploading(false);
     }
   };
 
-  const totalViews = videos.reduce((sum, v) => sum + v.views, 0);
-  const totalLikes = videos.reduce((sum, v) => sum + v.likes, 0);
+  const totalViews = videos.reduce((sum: any, v: any) => sum + (v.views ?? 0), 0);
+  const totalLikes = videos.reduce((sum: any, v: any) => sum + (v.likes ?? 0), 0);
 
   if (!isAuthenticated) return null;
 
   return (
     <Layout>
       <div className="container py-6">
-        {/* Header */}
+
+        {/* HEADER */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -120,19 +136,25 @@ export default function CreatorDashboard() {
               </p>
             </div>
           </div>
+
           <Button onClick={() => setShowUploadModal(true)} size="lg" className="gap-2">
             <Plus className="w-5 h-5" />
             Upload Video
           </Button>
         </motion.div>
 
-        {/* Stats */}
+        {/* STATS */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
             { label: "Total Videos", value: videos.length, icon: VideoIcon, color: "text-primary" },
             { label: "Total Views", value: formatNumber(totalViews), icon: Eye, color: "text-blue-500" },
             { label: "Total Likes", value: formatNumber(totalLikes), icon: Heart, color: "text-red-500" },
-            { label: "Engagement", value: `${videos.length > 0 ? ((totalLikes / totalViews) * 100).toFixed(1) : 0}%`, icon: TrendingUp, color: "text-green-500" },
+            {
+              label: "Engagement",
+              value: `${videos.length > 0 && totalViews > 0 ? ((totalLikes / totalViews) * 100).toFixed(1) : 0}%`,
+              icon: TrendingUp,
+              color: "text-green-500",
+            },
           ].map((stat, index) => (
             <motion.div
               key={stat.label}
@@ -157,7 +179,7 @@ export default function CreatorDashboard() {
           ))}
         </div>
 
-        {/* Videos List */}
+        {/* VIDEO LIST */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -165,6 +187,7 @@ export default function CreatorDashboard() {
               Your Videos
             </CardTitle>
           </CardHeader>
+
           <CardContent>
             {loading ? (
               <div className="space-y-4">
@@ -191,35 +214,42 @@ export default function CreatorDashboard() {
               </div>
             ) : (
               <div className="space-y-4">
-                {videos.map((video, index) => (
+                {videos.map((video: any, index) => (
                   <motion.div
-                    key={video.id}
+                    key={video.videoId}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1 }}
                     className="flex gap-4 p-3 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
-                    onClick={() => navigate(`/watch/${video.id}`)}
+                    onClick={() => navigate(`/watch/${video.videoId}`)}
                   >
                     <img
-                      src={video.thumbnailUrl}
+                      src={
+                        video.thumbnailUrl ||
+                        "https://via.placeholder.com/300x200?text=Video"
+                      }
                       alt={video.title}
                       className="w-32 h-20 object-cover rounded-lg"
                     />
+
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium truncate">{video.title}</h3>
                       <p className="text-sm text-muted-foreground line-clamp-1">
                         {video.caption}
                       </p>
+
                       <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Eye className="w-3 h-3" />
-                          {formatNumber(video.views)}
+                          {formatNumber(video.views ?? 0)}
                         </span>
+
                         <span className="flex items-center gap-1">
                           <Heart className="w-3 h-3" />
-                          {formatNumber(video.likes)}
+                          {formatNumber(video.likes ?? 0)}
                         </span>
-                        <span>{formatTimeAgo(video.createdAt)}</span>
+
+                        <span>{video.createdAt ? formatTimeAgo(video.createdAt) : "Just now"}</span>
                       </div>
                     </div>
                   </motion.div>
@@ -229,13 +259,14 @@ export default function CreatorDashboard() {
           </CardContent>
         </Card>
 
-        {/* Upload Modal */}
+        {/* UPLOAD MODAL */}
         {showUploadModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
               className="absolute inset-0 bg-background/80 backdrop-blur-sm"
               onClick={() => setShowUploadModal(false)}
             />
+
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -247,17 +278,16 @@ export default function CreatorDashboard() {
                     <Upload className="w-5 h-5" />
                     Upload Video
                   </CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => setShowUploadModal(false)}
-                  >
+
+                  <Button variant="ghost" size="icon-sm" onClick={() => setShowUploadModal(false)}>
                     <X className="w-4 h-4" />
                   </Button>
                 </CardHeader>
+
                 <CardContent>
                   <form onSubmit={handleUpload} className="space-y-4">
-                    {/* File Upload */}
+
+                    {/* FILE UPLOAD */}
                     <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
                       <input
                         type="file"
@@ -271,8 +301,10 @@ export default function CreatorDashboard() {
                           })
                         }
                       />
+
                       <label htmlFor="video-upload" className="cursor-pointer">
                         <FileVideo className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
+
                         {uploadForm.file ? (
                           <p className="text-sm font-medium">{uploadForm.file.name}</p>
                         ) : (
@@ -288,6 +320,7 @@ export default function CreatorDashboard() {
                       </label>
                     </div>
 
+                    {/* TITLE */}
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Title *</label>
                       <Input
@@ -299,6 +332,7 @@ export default function CreatorDashboard() {
                       />
                     </div>
 
+                    {/* CAPTION */}
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Caption *</label>
                       <Textarea
@@ -311,11 +345,13 @@ export default function CreatorDashboard() {
                       />
                     </div>
 
+                    {/* LOCATION */}
                     <div className="space-y-2">
                       <label className="text-sm font-medium flex items-center gap-2">
                         <MapPin className="w-4 h-4" />
                         Location
                       </label>
+
                       <Input
                         placeholder="Where was this filmed?"
                         value={uploadForm.location}
@@ -325,11 +361,13 @@ export default function CreatorDashboard() {
                       />
                     </div>
 
+                    {/* PEOPLE */}
                     <div className="space-y-2">
                       <label className="text-sm font-medium flex items-center gap-2">
                         <Users className="w-4 h-4" />
                         People in video
                       </label>
+
                       <Input
                         placeholder="@user1, @user2"
                         value={uploadForm.people}
@@ -348,20 +386,19 @@ export default function CreatorDashboard() {
                       >
                         Cancel
                       </Button>
-                      <Button
-                        type="submit"
-                        className="flex-1"
-                        disabled={uploading}
-                      >
+
+                      <Button type="submit" className="flex-1" disabled={uploading}>
                         {uploading ? "Uploading..." : "Upload"}
                       </Button>
                     </div>
+
                   </form>
                 </CardContent>
               </Card>
             </motion.div>
           </div>
         )}
+
       </div>
     </Layout>
   );
