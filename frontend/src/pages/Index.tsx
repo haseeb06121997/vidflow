@@ -28,20 +28,36 @@ const Index = () => {
     setLoading(true);
     try {
       const response = await api.getVideos();
-      // Sort based on filter
       let sorted = [...response.videos];
+
+      // 🔒 prevent crashes if backend doesn't send fields yet
+      sorted = sorted.map((v: any) => ({
+        ...v,
+        likes: v.likes ?? 0,
+        views: v.views ?? 0,
+        createdAt: v.createdAt ?? new Date().toISOString(),
+      }));
+
+      // ⭐ FILTER SORTING
       switch (activeFilter) {
         case "latest":
-          sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          sorted.sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() -
+              new Date(a.createdAt).getTime()
+          );
           break;
+
         case "popular":
-          sorted.sort((a, b) => b.views - a.views);
+          sorted.sort((a, b) => (b.views ?? 0) - (a.views ?? 0));
           break;
+
         case "trending":
         default:
-          sorted.sort((a, b) => b.likes - a.likes);
+          sorted.sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0));
           break;
       }
+
       setVideos(sorted);
     } catch (error) {
       console.error("Failed to load videos:", error);
@@ -60,12 +76,12 @@ const Index = () => {
           className="text-center mb-10"
         >
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4">
-            Discover{" "}
-            <span className="gradient-text">Amazing</span>{" "}
-            Videos
+            Discover <span className="gradient-text">Amazing</span> Videos
           </h1>
+
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Explore trending content from creators around the world. Share your moments, connect with others.
+            Explore trending content from creators around the world. Share your
+            moments, connect with others.
           </p>
         </motion.section>
 
@@ -88,7 +104,7 @@ const Index = () => {
         {/* Video Grid */}
         <VideoGrid videos={videos} loading={loading} />
 
-        {/* Load More */}
+        {/* Load More (not real pagination yet — reload for now) */}
         {!loading && videos.length > 0 && (
           <div className="flex justify-center mt-10">
             <Button variant="outline" size="lg" onClick={loadVideos}>
