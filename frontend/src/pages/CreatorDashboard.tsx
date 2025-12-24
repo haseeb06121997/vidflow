@@ -271,14 +271,14 @@ export default function CreatorDashboard() {
                     className="flex gap-4 p-3 rounded-lg hover:bg-secondary/50 transition cursor-pointer"
                     onClick={() => navigate(`/watch/${video.videoId}`)}
                   >
-                    <img
-                      src={
-                        video.thumbnailUrl ||
-                        "https://via.placeholder.com/300x200?text=Video"
-                      }
-                      alt={video.title}
-                      className="w-32 h-20 object-cover rounded-lg"
-                    />
+                    <video
+                      src={video.videoUrl}
+                      muted
+                      playsInline
+                      preload="metadata"
+                      poster={video.videoUrl}
+                      className="w-32 h-20 object-cover rounded-lg bg-black"
+                  />
 
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium truncate">{video.title}</h3>
