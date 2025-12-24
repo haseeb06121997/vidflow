@@ -488,4 +488,4 @@ export default function CreatorDashboard() {
     </Layout>
   );
 }
-:contentReference[oaicite:1]{index=1}
+export default CreatorDashboard;
