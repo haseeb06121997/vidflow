@@ -1,6 +1,6 @@
 import { Video, User } from "@/types";
 
-// IMPORTANT —  API base URL
+// IMPORTANT — API base URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // Temporary mock user until Cognito/Auth is added
@@ -16,16 +16,17 @@ export const mockUser: User = {
 /**
  * Small helper to make JSON requests and surface useful errors
  */
-async function jsonRequest<T = any>(url: string, options?: RequestInit): Promise<T> {
+async function jsonRequest<T = any>(
+  url: string,
+  options?: RequestInit
+): Promise<T> {
   const res = await fetch(url, options);
 
   if (!res.ok) {
     const text = await res.text();
-    // Helps a LOT when debugging Lambda / API Gateway
     throw new Error(`API Error: ${res.status} - ${text}`);
   }
 
-  // If body is empty (204 etc) just return null
   const text = await res.text();
   if (!text) return null as T;
 
@@ -42,7 +43,6 @@ export const api = {
    * LOGIN (still mock for now)
    */
   login: async (email: string, password: string) => {
-    // Fake delay
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     if (email && password) {
@@ -62,7 +62,6 @@ export const api = {
 
   /**
    * GET ALL VIDEOS
-   * GET /videos  -> Lambda -> DynamoDB
    */
   getVideos: async (page = 1, limit = 10) => {
     const videos: Video[] = await jsonRequest(`${API_BASE_URL}/videos`);
@@ -72,37 +71,35 @@ export const api = {
       page,
       limit,
       total: videos.length,
-      hasMore: false, // no real pagination yet
+      hasMore: false,
     };
   },
 
   /**
    * GET SINGLE VIDEO
-   * Right now: fetches all and finds the one we need.
-   * (We can switch to /videos/:id later)
    */
   getVideo: async (id: string) => {
     const videos: any[] = await jsonRequest(`${API_BASE_URL}/videos`);
 
     const video =
       videos.find((v) => v.videoId === id) ||
-      videos.find((v) => v.id === id); // fallback shape
+      videos.find((v) => v.id === id);
 
     if (!video) throw new Error("Video not found");
     return video as Video;
   },
 
   /**
-   * SEARCH
-   * Currently client-side filtering
+   * SEARCH VIDEOS
    */
   searchVideos: async (query: string) => {
     const videos: any[] = await jsonRequest(`${API_BASE_URL}/videos`);
-
     const q = query.toLowerCase();
 
     const results = videos.filter((v) => {
-      const text = `${v.title ?? ""} ${v.caption ?? ""} ${v.location ?? ""}`.toLowerCase();
+      const text = `${v.title ?? ""} ${v.caption ?? ""} ${
+        v.location ?? ""
+      }`.toLowerCase();
       return text.includes(q);
     });
 
@@ -111,28 +108,27 @@ export const api = {
 
   /**
    * ----------------------------
-   * UPLOAD VIDEO (REAL AWS FLOW)
+   * UPLOAD VIDEO
    * ----------------------------
    *
-   * 1️⃣ POST /upload-url  -> Lambda (returns signed URL + ids)
-   * 2️⃣ PUT to S3 using signed URL (browser → S3, no backend hop)
-   * 3️⃣ POST /videos -> save metadata in DynamoDB
+   * 1️⃣ POST /upload-url
+   * 2️⃣ PUT → S3
+   * 3️⃣ POST /videos
    */
   uploadVideo: async (formData: FormData, creatorIdOverride?: string) => {
     const file = formData.get("file") as File | null;
     const title = (formData.get("title") as string) || "";
     const caption = (formData.get("caption") as string) || "";
     const location = (formData.get("location") as string) || "";
+
     const creatorId =
       (formData.get("creatorId") as string) ||
       creatorIdOverride ||
       mockUser.id;
 
-    if (!file) {
-      throw new Error("No video file selected");
-    }
+    if (!file) throw new Error("No video file selected");
 
-    // 1️⃣ ask backend for signed upload URL
+    // 1️⃣ Backend creates signed URL
     const uploadData = await jsonRequest<{
       uploadUrl: string;
       videoId: string;
@@ -152,7 +148,7 @@ export const api = {
 
     const { uploadUrl, videoId, key, videoUrl } = uploadData;
 
-    // 2️⃣ upload file directly to S3
+    // 2️⃣ Upload file directly to S3
     await fetch(uploadUrl, {
       method: "PUT",
       headers: {
@@ -161,7 +157,7 @@ export const api = {
       body: file,
     });
 
-    // 3️⃣ save metadata in DynamoDB
+    // 3️⃣ Save metadata
     const saved = await jsonRequest<any>(`${API_BASE_URL}/videos`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -172,22 +168,19 @@ export const api = {
         location,
         videoUrl,
         s3Key: key,
-        creatorId, // <— important: so /videos can be filtered per creator
+        creatorId,
       }),
     });
 
-    // Lambda returns { message, item } in our code
     return (saved.item ?? saved) as Video;
   },
 
   /**
-   * Creator-specific list
-   * (Currently just filters the list returned by GET /videos)
+   * CREATOR VIDEOS
    */
   getCreatorVideos: async (creatorId: string) => {
     const videos: any[] = await jsonRequest(`${API_BASE_URL}/videos`);
 
-    // If backend doesn’t yet save creatorId, this will just return all videos.
     const filtered =
       videos.some((v) => "creatorId" in v)
         ? videos.filter((v) => v.creatorId === creatorId)
@@ -197,11 +190,8 @@ export const api = {
   },
 
   /**
-   * -----------------------------------
-   * COMMENTS & RATING (mock for now)
-   * -----------------------------------
+   * COMMENTS (mock)
    */
-
   getComments: async (videoId: string) => {
     return [
       {
@@ -233,4 +223,3 @@ export const api = {
     return { videoId, rating, success: true };
   },
 };
-:contentReference[oaicite:0]{index=0}
