@@ -13,6 +13,7 @@ import {
   X,
   FileVideo,
 } from "lucide-react";
+
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,39 +31,65 @@ export default function CreatorDashboard() {
 
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  const [uploadForm, setUploadForm] = useState({
+  const [uploadForm, setUploadForm] = useState<{
+    title: string;
+    caption: string;
+    location: string;
+    people: string;
+    file: File | null;
+  }>({
     title: "",
     caption: "",
     location: "",
     people: "",
-    file: null as File | null,
+    file: null,
   });
 
+  /**
+   * Redirect unauthenticated users + load videos for the logged in creator
+   */
   useEffect(() => {
     if (!isAuthenticated) {
       navigate("/creator/login");
       return;
     }
+
     loadVideos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, navigate]);
 
   const loadVideos = async () => {
     if (!user) return;
+
     try {
+      setLoading(true);
       const data = await api.getCreatorVideos(user.id);
       setVideos(data);
     } catch (error) {
       console.error("Failed to load videos:", error);
+      toast.error("Failed to load your videos");
     } finally {
       setLoading(false);
     }
   };
 
+  /**
+   * Handle upload flow:
+   * 1. Validate form
+   * 2. Call api.uploadVideo (which talks to AWS)
+   * 3. Refresh list
+   */
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!user) {
+      toast.error("You must be logged in to upload");
+      return;
+    }
 
     if (!uploadForm.title || !uploadForm.caption) {
       toast.error("Please fill in title and caption");
@@ -82,12 +109,14 @@ export default function CreatorDashboard() {
       formData.append("caption", uploadForm.caption);
       formData.append("location", uploadForm.location || "");
       formData.append("people", uploadForm.people || "");
-      formData.append("file", uploadForm.file); // IMPORTANT
+      formData.append("file", uploadForm.file);
+      formData.append("creatorId", user.id); // so DynamoDB can store who owns it
 
-      await api.uploadVideo(formData);
+      await api.uploadVideo(formData, user.id);
 
       toast.success("Video uploaded successfully!");
 
+      // Reset form / close modal / reload list
       setShowUploadModal(false);
       setUploadForm({
         title: "",
@@ -97,7 +126,7 @@ export default function CreatorDashboard() {
         file: null,
       });
 
-      loadVideos();
+      await loadVideos();
     } catch (error) {
       console.error(error);
       toast.error("Failed to upload video");
@@ -106,15 +135,20 @@ export default function CreatorDashboard() {
     }
   };
 
-  const totalViews = videos.reduce((sum: any, v: any) => sum + (v.views ?? 0), 0);
-  const totalLikes = videos.reduce((sum: any, v: any) => sum + (v.likes ?? 0), 0);
+  const totalViews = videos.reduce(
+    (sum: number, v: any) => sum + (v.views ?? 0),
+    0
+  );
+  const totalLikes = videos.reduce(
+    (sum: number, v: any) => sum + (v.likes ?? 0),
+    0
+  );
 
   if (!isAuthenticated) return null;
 
   return (
     <Layout>
       <div className="container py-6">
-
         {/* HEADER */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -137,7 +171,11 @@ export default function CreatorDashboard() {
             </div>
           </div>
 
-          <Button onClick={() => setShowUploadModal(true)} size="lg" className="gap-2">
+          <Button
+            onClick={() => setShowUploadModal(true)}
+            size="lg"
+            className="gap-2"
+          >
             <Plus className="w-5 h-5" />
             Upload Video
           </Button>
@@ -146,12 +184,31 @@ export default function CreatorDashboard() {
         {/* STATS */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
-            { label: "Total Videos", value: videos.length, icon: VideoIcon, color: "text-primary" },
-            { label: "Total Views", value: formatNumber(totalViews), icon: Eye, color: "text-blue-500" },
-            { label: "Total Likes", value: formatNumber(totalLikes), icon: Heart, color: "text-red-500" },
+            {
+              label: "Total Videos",
+              value: videos.length,
+              icon: VideoIcon,
+              color: "text-primary",
+            },
+            {
+              label: "Total Views",
+              value: formatNumber(totalViews),
+              icon: Eye,
+              color: "text-blue-500",
+            },
+            {
+              label: "Total Likes",
+              value: formatNumber(totalLikes),
+              icon: Heart,
+              color: "text-red-500",
+            },
             {
               label: "Engagement",
-              value: `${videos.length > 0 && totalViews > 0 ? ((totalLikes / totalViews) * 100).toFixed(1) : 0}%`,
+              value: `${
+                videos.length > 0 && totalViews > 0
+                  ? ((totalLikes / totalViews) * 100).toFixed(1)
+                  : 0
+              }%`,
               icon: TrendingUp,
               color: "text-green-500",
             },
@@ -170,7 +227,9 @@ export default function CreatorDashboard() {
                     </div>
                     <div>
                       <p className="text-2xl font-bold">{stat.value}</p>
-                      <p className="text-sm text-muted-foreground">{stat.label}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {stat.label}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -207,7 +266,10 @@ export default function CreatorDashboard() {
                 <p className="text-muted-foreground mb-4">
                   No videos uploaded yet
                 </p>
-                <Button onClick={() => setShowUploadModal(true)} className="gap-2">
+                <Button
+                  onClick={() => setShowUploadModal(true)}
+                  className="gap-2"
+                >
                   <Plus className="w-4 h-4" />
                   Upload Your First Video
                 </Button>
@@ -249,7 +311,11 @@ export default function CreatorDashboard() {
                           {formatNumber(video.likes ?? 0)}
                         </span>
 
-                        <span>{video.createdAt ? formatTimeAgo(video.createdAt) : "Just now"}</span>
+                        <span>
+                          {video.createdAt
+                            ? formatTimeAgo(video.createdAt)
+                            : "Just now"}
+                        </span>
                       </div>
                     </div>
                   </motion.div>
@@ -279,14 +345,17 @@ export default function CreatorDashboard() {
                     Upload Video
                   </CardTitle>
 
-                  <Button variant="ghost" size="icon-sm" onClick={() => setShowUploadModal(false)}>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => setShowUploadModal(false)}
+                  >
                     <X className="w-4 h-4" />
                   </Button>
                 </CardHeader>
 
                 <CardContent>
                   <form onSubmit={handleUpload} className="space-y-4">
-
                     {/* FILE UPLOAD */}
                     <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
                       <input
@@ -295,10 +364,10 @@ export default function CreatorDashboard() {
                         className="hidden"
                         id="video-upload"
                         onChange={(e) =>
-                          setUploadForm({
-                            ...uploadForm,
+                          setUploadForm((prev) => ({
+                            ...prev,
                             file: e.target.files?.[0] || null,
-                          })
+                          }))
                         }
                       />
 
@@ -306,7 +375,9 @@ export default function CreatorDashboard() {
                         <FileVideo className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
 
                         {uploadForm.file ? (
-                          <p className="text-sm font-medium">{uploadForm.file.name}</p>
+                          <p className="text-sm font-medium">
+                            {uploadForm.file.name}
+                          </p>
                         ) : (
                           <>
                             <p className="text-sm font-medium">
@@ -327,7 +398,10 @@ export default function CreatorDashboard() {
                         placeholder="Give your video a title"
                         value={uploadForm.title}
                         onChange={(e) =>
-                          setUploadForm({ ...uploadForm, title: e.target.value })
+                          setUploadForm((prev) => ({
+                            ...prev,
+                            title: e.target.value,
+                          }))
                         }
                       />
                     </div>
@@ -339,7 +413,10 @@ export default function CreatorDashboard() {
                         placeholder="Describe your video..."
                         value={uploadForm.caption}
                         onChange={(e) =>
-                          setUploadForm({ ...uploadForm, caption: e.target.value })
+                          setUploadForm((prev) => ({
+                            ...prev,
+                            caption: e.target.value,
+                          }))
                         }
                         rows={3}
                       />
@@ -356,7 +433,10 @@ export default function CreatorDashboard() {
                         placeholder="Where was this filmed?"
                         value={uploadForm.location}
                         onChange={(e) =>
-                          setUploadForm({ ...uploadForm, location: e.target.value })
+                          setUploadForm((prev) => ({
+                            ...prev,
+                            location: e.target.value,
+                          }))
                         }
                       />
                     </div>
@@ -372,7 +452,10 @@ export default function CreatorDashboard() {
                         placeholder="@user1, @user2"
                         value={uploadForm.people}
                         onChange={(e) =>
-                          setUploadForm({ ...uploadForm, people: e.target.value })
+                          setUploadForm((prev) => ({
+                            ...prev,
+                            people: e.target.value,
+                          }))
                         }
                       />
                     </div>
@@ -387,19 +470,22 @@ export default function CreatorDashboard() {
                         Cancel
                       </Button>
 
-                      <Button type="submit" className="flex-1" disabled={uploading}>
+                      <Button
+                        type="submit"
+                        className="flex-1"
+                        disabled={uploading}
+                      >
                         {uploading ? "Uploading..." : "Upload"}
                       </Button>
                     </div>
-
                   </form>
                 </CardContent>
               </Card>
             </motion.div>
           </div>
         )}
-
       </div>
     </Layout>
   );
 }
+:contentReference[oaicite:1]{index=1}
