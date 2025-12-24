@@ -49,9 +49,6 @@ export default function CreatorDashboard() {
     file: null,
   });
 
-  /**
-   * Redirect unauthenticated users + load videos for the logged in creator
-   */
   useEffect(() => {
     if (!isAuthenticated) {
       navigate("/creator/login");
@@ -59,7 +56,6 @@ export default function CreatorDashboard() {
     }
 
     loadVideos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, navigate]);
 
   const loadVideos = async () => {
@@ -77,12 +73,6 @@ export default function CreatorDashboard() {
     }
   };
 
-  /**
-   * Handle upload flow:
-   * 1. Validate form
-   * 2. Call api.uploadVideo (which talks to AWS)
-   * 3. Refresh list
-   */
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -110,13 +100,12 @@ export default function CreatorDashboard() {
       formData.append("location", uploadForm.location || "");
       formData.append("people", uploadForm.people || "");
       formData.append("file", uploadForm.file);
-      formData.append("creatorId", user.id); // so DynamoDB can store who owns it
+      formData.append("creatorId", user.id);
 
       await api.uploadVideo(formData, user.id);
 
       toast.success("Video uploaded successfully!");
 
-      // Reset form / close modal / reload list
       setShowUploadModal(false);
       setUploadForm({
         title: "",
@@ -139,6 +128,7 @@ export default function CreatorDashboard() {
     (sum: number, v: any) => sum + (v.views ?? 0),
     0
   );
+
   const totalLikes = videos.reduce(
     (sum: number, v: any) => sum + (v.likes ?? 0),
     0
@@ -149,7 +139,6 @@ export default function CreatorDashboard() {
   return (
     <Layout>
       <div className="container py-6">
-        {/* HEADER */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -161,6 +150,7 @@ export default function CreatorDashboard() {
               alt={user?.name}
               className="w-16 h-16 rounded-full border-2 border-primary"
             />
+
             <div>
               <h1 className="text-2xl md:text-3xl font-bold">
                 Welcome back, {user?.name?.split(" ")[0]}!
@@ -181,26 +171,22 @@ export default function CreatorDashboard() {
           </Button>
         </motion.div>
 
-        {/* STATS */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
             {
               label: "Total Videos",
               value: videos.length,
               icon: VideoIcon,
-              color: "text-primary",
             },
             {
               label: "Total Views",
               value: formatNumber(totalViews),
               icon: Eye,
-              color: "text-blue-500",
             },
             {
               label: "Total Likes",
               value: formatNumber(totalLikes),
               icon: Heart,
-              color: "text-red-500",
             },
             {
               label: "Engagement",
@@ -210,7 +196,6 @@ export default function CreatorDashboard() {
                   : 0
               }%`,
               icon: TrendingUp,
-              color: "text-green-500",
             },
           ].map((stat, index) => (
             <motion.div
@@ -219,12 +204,13 @@ export default function CreatorDashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
             >
-              <Card className="hover:border-primary/50 transition-colors">
+              <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg bg-secondary ${stat.color}`}>
+                    <div className="p-2 rounded-lg bg-secondary">
                       <stat.icon className="w-5 h-5" />
                     </div>
+
                     <div>
                       <p className="text-2xl font-bold">{stat.value}</p>
                       <p className="text-sm text-muted-foreground">
@@ -238,7 +224,6 @@ export default function CreatorDashboard() {
           ))}
         </div>
 
-        {/* VIDEO LIST */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -266,6 +251,7 @@ export default function CreatorDashboard() {
                 <p className="text-muted-foreground mb-4">
                   No videos uploaded yet
                 </p>
+
                 <Button
                   onClick={() => setShowUploadModal(true)}
                   className="gap-2"
@@ -282,7 +268,7 @@ export default function CreatorDashboard() {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1 }}
-                    className="flex gap-4 p-3 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+                    className="flex gap-4 p-3 rounded-lg hover:bg-secondary/50 transition cursor-pointer"
                     onClick={() => navigate(`/watch/${video.videoId}`)}
                   >
                     <img
@@ -296,6 +282,7 @@ export default function CreatorDashboard() {
 
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium truncate">{video.title}</h3>
+
                       <p className="text-sm text-muted-foreground line-clamp-1">
                         {video.caption}
                       </p>
@@ -325,7 +312,6 @@ export default function CreatorDashboard() {
           </CardContent>
         </Card>
 
-        {/* UPLOAD MODAL */}
         {showUploadModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
@@ -356,13 +342,12 @@ export default function CreatorDashboard() {
 
                 <CardContent>
                   <form onSubmit={handleUpload} className="space-y-4">
-                    {/* FILE UPLOAD */}
-                    <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
+                    <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50">
                       <input
+                        id="video-upload"
                         type="file"
                         accept="video/*"
                         className="hidden"
-                        id="video-upload"
                         onChange={(e) =>
                           setUploadForm((prev) => ({
                             ...prev,
@@ -391,7 +376,6 @@ export default function CreatorDashboard() {
                       </label>
                     </div>
 
-                    {/* TITLE */}
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Title *</label>
                       <Input
@@ -406,10 +390,10 @@ export default function CreatorDashboard() {
                       />
                     </div>
 
-                    {/* CAPTION */}
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Caption *</label>
                       <Textarea
+                        rows={3}
                         placeholder="Describe your video..."
                         value={uploadForm.caption}
                         onChange={(e) =>
@@ -418,11 +402,9 @@ export default function CreatorDashboard() {
                             caption: e.target.value,
                           }))
                         }
-                        rows={3}
                       />
                     </div>
 
-                    {/* LOCATION */}
                     <div className="space-y-2">
                       <label className="text-sm font-medium flex items-center gap-2">
                         <MapPin className="w-4 h-4" />
@@ -441,7 +423,6 @@ export default function CreatorDashboard() {
                       />
                     </div>
 
-                    {/* PEOPLE */}
                     <div className="space-y-2">
                       <label className="text-sm font-medium flex items-center gap-2">
                         <Users className="w-4 h-4" />
@@ -488,4 +469,3 @@ export default function CreatorDashboard() {
     </Layout>
   );
 }
-export default CreatorDashboard;
